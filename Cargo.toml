@@ -1,0 +1,12 @@
+[package]
+name = "consul-kv-trigger"
+description = "Watch Consul KV and act on changes"
+version = "0.1.0"
+edition = "2021"
+authors = ["Oli Dacombe <olidacombe@gmail.com>"]
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+consul = "0.4.2"
+thiserror = "1.0.31"
+tracing = "0.1.34"
