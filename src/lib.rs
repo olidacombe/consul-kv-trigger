@@ -8,7 +8,7 @@ pub enum WatcherError {
     Consul(#[from] consul::errors::Error),
 }
 
-struct Watcher {
+pub struct Watcher {
     client: Client,
     path: String,
 }
