@@ -2,6 +2,11 @@ use consul::kv::{KVPair, KV};
 use consul::{Client, Config, QueryOptions};
 use core::future::Future;
 use thiserror::Error;
+use tokio::task::spawn_blocking;
+use tokio::time::{sleep, Duration};
+
+// TODO make configurable
+const MIN_ERROR_BACKOFF_MS: u64 = 1000;
 
 #[derive(Error, Debug)]
 pub enum WatcherError {
@@ -32,14 +37,22 @@ impl Watcher {
             wait_time: None,
         };
 
+        let backoff = Duration::from_millis(MIN_ERROR_BACKOFF_MS);
+
         loop {
-            match self.client.get(&self.path, Some(&opts)) {
-                Ok((kv, meta)) => {
-                    opts.wait_index = meta.last_index;
-                    callback(kv).await;
-                }
-                Err(e) => tracing::error!("{:?}", e),
-            }
+            let result = spawn_blocking(|| self.client.get(&self.path, Some(&opts)))
+                .await
+                // TODO fix usage of async in here
+                .map(|result| match result {
+                    Ok((kv, meta)) => {
+                        opts.wait_index = meta.last_index;
+                        //callback(kv).await;
+                    }
+                    Err(e) => {
+                        tracing::error!("{:?}", e);
+                        sleep(backoff).await;
+                    }
+                });
         }
     }
 }
