@@ -1,5 +1,6 @@
 use consul::kv::{KVPair, KV};
 use consul::{Client, Config, QueryOptions};
+use core::future::Future;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -20,7 +21,11 @@ impl Watcher {
             path,
         })
     }
-    pub fn run<F: Fn(Option<KVPair>)>(&self, callback: F) {
+    pub async fn run<F, Fut>(&self, callback: F)
+    where
+        F: Fn(Option<KVPair>) -> Fut,
+        Fut: Future<Output = ()>,
+    {
         let mut opts = QueryOptions {
             datacenter: None,
             wait_index: None,
@@ -31,7 +36,7 @@ impl Watcher {
             match self.client.get(&self.path, Some(&opts)) {
                 Ok((kv, meta)) => {
                     opts.wait_index = meta.last_index;
-                    callback(kv);
+                    callback(kv).await;
                 }
                 Err(e) => tracing::error!("{:?}", e),
             }

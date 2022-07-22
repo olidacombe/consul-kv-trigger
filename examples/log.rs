@@ -13,7 +13,8 @@ struct Args {
     path: String,
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     LogTracer::init().expect("Failed to set logger");
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     let formatter = fmt::Layer::default();
@@ -24,11 +25,13 @@ fn main() -> Result<()> {
 
     let watcher = Watcher::new(args.path).unwrap();
 
-    watcher.run(|kv| {
-        if let Some(pair) = kv {
-            tracing::info!("{:?}", pair);
-        }
-    });
+    watcher
+        .run(|kv| async move {
+            if let Some(pair) = kv {
+                tracing::info!("{:?}", pair);
+            }
+        })
+        .await;
 
     Ok(())
 }
