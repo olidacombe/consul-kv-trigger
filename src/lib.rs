@@ -2,7 +2,7 @@ use consul::kv::{KVPair, KV};
 use consul::{Client, Config, QueryOptions};
 use core::future::Future;
 use thiserror::Error;
-use tokio::task::spawn_blocking;
+use tokio::task::{block_in_place, spawn_blocking};
 use tokio::time::{sleep, Duration};
 
 // TODO make configurable
@@ -40,19 +40,19 @@ impl Watcher {
         let backoff = Duration::from_millis(MIN_ERROR_BACKOFF_MS);
 
         loop {
-            let result = spawn_blocking(|| self.client.get(&self.path, Some(&opts)))
-                .await
-                // TODO fix usage of async in here
-                .map(|result| match result {
-                    Ok((kv, meta)) => {
-                        opts.wait_index = meta.last_index;
-                        //callback(kv).await;
-                    }
-                    Err(e) => {
-                        tracing::error!("{:?}", e);
-                        sleep(backoff).await;
-                    }
-                });
+            let client = self.client.clone();
+            let path = self.path.clone();
+            let options = opts.clone();
+            match block_in_place(move || client.get(&path, Some(&options))) {
+                Ok((kv, meta)) => {
+                    opts.wait_index = meta.last_index;
+                    callback(kv).await;
+                }
+                Err(e) => {
+                    tracing::error!("{:?}", e);
+                    sleep(backoff).await;
+                }
+            }
         }
     }
 }
