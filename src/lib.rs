@@ -1,6 +1,10 @@
 use consul::kv::{KVPair, KV};
 use consul::{Client, Config, QueryOptions};
+use std::{thread, time};
 use thiserror::Error;
+
+// TODO make configurable
+const MIN_ERROR_BACKOFF_MS: u64 = 1000;
 
 #[derive(Error, Debug)]
 pub enum WatcherError {
@@ -27,13 +31,18 @@ impl Watcher {
             wait_time: None,
         };
 
+        let backoff = time::Duration::from_millis(MIN_ERROR_BACKOFF_MS);
+
         loop {
             match self.client.get(&self.path, Some(&opts)) {
                 Ok((kv, meta)) => {
                     opts.wait_index = meta.last_index;
                     callback(kv);
                 }
-                Err(e) => tracing::error!("{:?}", e),
+                Err(e) => {
+                    tracing::error!("{:?}", e);
+                    thread::sleep(backoff);
+                }
             }
         }
     }
