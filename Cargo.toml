@@ -5,6 +5,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Oli Dacombe <olidacombe@gmail.com>"]
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/olidacombe/consul-kv-trigger"
 
 [dependencies]
 rs-consul = "0.2.2"
