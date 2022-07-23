@@ -7,12 +7,14 @@ authors = ["Oli Dacombe <olidacombe@gmail.com>"]
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-consul = "0.4.2"
+rs-consul = "0.2.2"
 thiserror = "1.0.31"
+tokio = { version = "1.20.0", features = ["time"] }
 tracing = "0.1.34"
 
 [dev-dependencies]
 clap = { version = "3.2.14", features = ["derive"] }
 eyre = "0.6.8"
+tokio = { version = "1.20.0", features = ["macros", "rt-multi-thread"] }
 tracing-log = "0.1.3"
 tracing-subscriber = { version = "0.3", features = ["registry", "env-filter"] }
