@@ -1,8 +1,9 @@
-use consul::kv::{KVPair, KV};
-use consul::{Client, Config, QueryOptions};
 use core::future::Future;
+use rs_consul::{
+    types::{ReadKeyRequest, ReadKeyResponse},
+    Config, Consul, ConsulError,
+};
 use thiserror::Error;
-use tokio::task::{block_in_place, spawn_blocking};
 use tokio::time::{sleep, Duration};
 
 // TODO make configurable
@@ -11,42 +12,42 @@ const MIN_ERROR_BACKOFF_MS: u64 = 1000;
 #[derive(Error, Debug)]
 pub enum WatcherError {
     #[error(transparent)]
-    Consul(#[from] consul::errors::Error),
+    Consul(#[from] ConsulError),
 }
 
 pub struct Watcher {
-    client: Client,
+    client: Consul,
     path: String,
 }
 
 impl Watcher {
-    pub fn new(path: String) -> Result<Self, WatcherError> {
-        Ok(Self {
-            client: Client::new(Config::new_from_env()?),
+    pub fn new(path: String) -> Self {
+        Self {
+            client: Consul::new(Config::from_env()),
             path,
-        })
+        }
     }
     pub async fn run<F, Fut>(&self, callback: F)
     where
-        F: Fn(Option<KVPair>) -> Fut,
+        F: Fn(Vec<ReadKeyResponse>) -> Fut,
         Fut: Future<Output = ()>,
     {
-        let mut opts = QueryOptions {
-            datacenter: None,
-            wait_index: None,
-            wait_time: None,
-        };
+        let mut query = ReadKeyRequest::default();
 
         let backoff = Duration::from_millis(MIN_ERROR_BACKOFF_MS);
 
         loop {
-            let client = self.client.clone();
-            let path = self.path.clone();
-            let options = opts.clone();
-            match block_in_place(move || client.get(&path, Some(&options))) {
-                Ok((kv, meta)) => {
-                    opts.wait_index = meta.last_index;
-                    callback(kv).await;
+            query.key = &self.path;
+            match self.client.read_key(query.clone()).await {
+                Ok(responses) => {
+                    if let Some(response) = responses.first() {
+                        // this should be the largest for the entire
+                        // prefix or a recursive query acconding to
+                        // documentation, so no need to take a max
+                        // over the vector
+                        query.index = response.modify_index.try_into().ok();
+                    }
+                    callback(responses).await;
                 }
                 Err(e) => {
                     tracing::error!("{:?}", e);

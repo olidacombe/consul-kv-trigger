@@ -1,7 +1,6 @@
 use clap::Parser;
 use consul_kv_trigger::Watcher;
 use eyre::Result;
-use tokio::task::{block_in_place, spawn_blocking};
 use tracing::subscriber::set_global_default;
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter, Registry};
@@ -15,17 +14,7 @@ struct Args {
 }
 
 #[tokio::main]
-async fn watch(watcher: Watcher) {
-    watcher
-        .run(|kv| async move {
-            if let Some(pair) = kv {
-                tracing::info!("{:?}", pair);
-            }
-        })
-        .await;
-}
-
-fn main() -> Result<()> {
+async fn main() -> Result<()> {
     LogTracer::init().expect("Failed to set logger");
 
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
@@ -35,9 +24,12 @@ fn main() -> Result<()> {
 
     let args = Args::parse();
 
-    let watcher = Watcher::new(args.path).unwrap();
-
-    watch(watcher);
+    let watcher = Watcher::new(args.path);
+    watcher
+        .run(|results| async move {
+            tracing::info!("{:?}", results);
+        })
+        .await;
 
     Ok(())
 }
